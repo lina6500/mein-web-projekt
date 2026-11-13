@@ -41,6 +41,8 @@ import { SoundController } from "./soundcontroller.js";
 export class Controller {
 
     //RENDERER
+    //Alle Renderer bekommen Container/Ticker aus derselben PIXI.Application, 
+    // damit es nur eine App und nur einen Ticker gibt.
     renderer;
     playerRenderer;
     coinRenderer;
@@ -59,7 +61,10 @@ export class Controller {
     levelSelectRenderer;
     pauseScreen;
 
-    //MODEL
+    //MODEL= „Was existiert gerade im Spiel?“
+    //Datenobjekte, die im Level existieren:
+    //→ Der LevelLoader erzeugt die Objekte aus der ASCII-Levelmap 
+    // und legt sie in Arrays ab.
     player;
     enemy;
     enemySprite;
@@ -97,15 +102,20 @@ export class Controller {
     lifes = []; //Liste aller Leben die man einsammeln kann im Level
 
     totalCoins = this.coins.length;  
+    //Zähler für HUD
     collectedCoins = 0;
     collected5Coins = 0;
 
     //SCREEN / GAMESTATE
+    //Weil die GameLoop nur laufen soll, wenn wirklich gespielt wird.
     gameStarted = false;
     isPaused = false; 
     isGameOver = false;
     isGameWin = false;
-    gameLoopRunning = false;
+    gameLoopRunning = false; //wegen den bug, dass gameloop deoppelt startet wurde
+
+    //Wenn verloren/gewonnen/pausiert/nicht gestartet → gameLoop() macht ein frühes return und updated nichts. Außerdem gibt’s
+
 
     playerLocked = false; //kein playerUpdate(), wenn der Player im Fahrstuhl ist
     pressLeftKey = false; //bug beim Fahrstuhl
@@ -115,7 +125,7 @@ export class Controller {
     currentLevelIndex = 0; //beim ersten Level starten!!!
     unlockedLevels = 1; //Anzahl der freigeschalteten Level, d.h. Lvl1 = 1, Lvl1 & 2 = 2
 
-
+    //Start-Setup. schritt 1) model verarbeiten
     //methode um das ganze Spiel zu initialisieren. Hier werden die Methoden aus der View usw aufgerufen. 
     async initController() {
         //MODEL:
@@ -123,6 +133,7 @@ export class Controller {
         this.collision = new Collision();
 
         //VIEW:
+        // schritt 2)Renderer (PIXI) starten + Assets laden
         this.renderer = new Renderer();
         await this.renderer.initRenderer(); //hier wird die PIXI.app erzeugt
         await this.renderer.loadAssets(); //Spiel-Elemente laden
@@ -146,6 +157,7 @@ export class Controller {
         this.elevatorHint = this.elevatorRenderer.createElevatorHint(this.player);
 
         //STARTSCREEN
+        //schritt 3)ui screen erstellen 
         this.startScreenRenderer = new StartScreenRenderer(
           this.renderer.ui,
           this.renderer.screen
@@ -170,6 +182,7 @@ export class Controller {
 
 
         //CONTROLLER:
+        //schritt 4) LevelLoader erstellen
         this.levelloader = new LevelLoader(this.renderer, this.playerRenderer, 
                                            this.sceneRenderer,
                                            this.collision,
@@ -184,6 +197,7 @@ export class Controller {
                                 
 
         //SOUND:
+        //schritt 5) SoundController erstellen
         this.sound = new SoundController(); //SoundController initialisieren 
         
         //SoundButton
@@ -205,6 +219,7 @@ export class Controller {
         // });
         
         //=== NAVIGATE ===
+        //Schritt 6) Navigation + EventListener
         this.navigateThroughGame();
         
         //=== ABFRAGEN ===
@@ -216,16 +231,16 @@ export class Controller {
 
     //=== START GAME ============================================================================================
     startGame() {
-        //Startscreen sofort anzeigen
+        //1-Startscreen sofort anzeigen
         this.startScreenRenderer.show();
 
-        //SPIEL STARTEN, wenn auf den Button geklickt wird
+        //2-SPIEL STARTEN, wenn auf den Button geklickt wird
         this.startScreenRenderer.createStartButton(() => { 
           this.startScreenRenderer.hide();
         
           this.levelSelectRenderer.show();
 
-          //Level auswählen
+          //3-Level auswählen
           this.levelSelectRenderer.showLevels(
             //Beim Klick wird das Level geladen
             this.levelloader.levels, 
@@ -233,10 +248,13 @@ export class Controller {
               this.levelSelectRenderer.hide();
               await this.loadLevel(levelIndex);
               
+              //4-Spiel starten
               this.setGameState("gameStarted") //Spiel ist gestartet
+              //5-Hintergrundmusik starten
               this.sound.backroundMusic();
               this.musicPlays = true;
               
+              //6-GameLoop nur einmal starten
               //Sicher gehen, dass die Gameloop nur einmal gestartet wird 
               if (!this.gameLoopRunning) {
                 this.renderer.startGameLoop((dt) => this.gameLoop(dt)); //gameloop!
